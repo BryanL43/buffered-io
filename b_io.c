@@ -30,8 +30,9 @@ typedef struct b_fcb {
 
 	// Add any other needed variables here to track the individual open file
 	char* buffer;
-	int bufferPos;	//Tracks current buffer index
-    int filePos;	//Tracks the amount of bytes read from file
+	int bufferPos;		//Tracks current buffer index
+    int filePos;		//Tracks the amount of bytes read from file
+	int blockOffset;	//Block offset from file location
 } b_fcb;
 	
 //static array of file control blocks
@@ -93,7 +94,6 @@ b_io_fd b_open (char * filename, int flags) {
 
 	fcbArray[fd].buffer = malloc(B_CHUNK_SIZE);
 	if (fcbArray[fd].buffer == NULL) {
-		free(fcbArray[fd].fi);
 		fcbArray[fd].fi = NULL;
 		perror("Failed to allocate buffer!");
 		return -1;
@@ -102,11 +102,12 @@ b_io_fd b_open (char * filename, int flags) {
 	fcbArray[fd].fi = fileInfo;
 	fcbArray[fd].bufferPos = 0;
 	fcbArray[fd].filePos = 0;
+	fcbArray[fd].blockOffset = 0;
 
 	return fd;
 }
 
-
+int abcde = 0;
 
 // b_read functions just like its Linux counterpart read.  The user passes in
 // the file descriptor (index into fcbArray), a buffer where thay want you to 
@@ -116,7 +117,7 @@ b_io_fd b_open (char * filename, int flags) {
 // be less only when you have run out of bytes to read.  i.e. End of File	
 int b_read (b_io_fd fd, char * buffer, int count) {
 	//*** TODO ***//  
-	// Write buffered read function to return the data and # bytes read
+	// Write buffered read function tbufferPos = bytesToCopy;o return the data and # bytes read
 	// You must use LBAread and you must buffer the data in B_CHUNK_SIZE byte chunks.
 		
 	if (startup == 0) b_init();  //Initialize our system
@@ -141,32 +142,49 @@ int b_read (b_io_fd fd, char * buffer, int count) {
 	b_fcb* fcb = &fcbArray[fd];
     int bytesCopied = 0;
 
-    //Adjust count if it exceeds the remaining file size
+    //EOF cap: Ensure count does not exceed the remaining file size
     if (fcb->filePos + count > fcb->fi->fileSize) {
         count = fcb->fi->fileSize - fcb->filePos;
     }
 
-    while (bytesCopied < count) {
-        //Check if buffer needs refilling
-		if (fcb->bufferPos >= B_CHUNK_SIZE || fcb->filePos == 0) {
-            int blockNum = fcb->filePos / B_CHUNK_SIZE;
-            LBAread(fcb->buffer, 1, fcb->fi->location + blockNum);
-            fcb->bufferPos = 0;
-        }
+    //Handle remaining data in OUR buffer (Clean out OUR buffer)
+    if (fcb->bufferPos > 0) {
+        //Copies existing data in OUR buffer to USER buffer
+        int bytesAvailable = B_CHUNK_SIZE - fcb->bufferPos;
+        int bytesToCopy = (count < bytesAvailable) ? count : bytesAvailable;
+        memcpy(buffer, fcb->buffer + fcb->bufferPos, bytesToCopy);
 
-        //Calculate bytes available in the buffer and bytes to copy
-		int bytesAvailable = B_CHUNK_SIZE - fcb->bufferPos;
-        int bytesToCopy = (count - bytesCopied < bytesAvailable) ? count - bytesCopied : bytesAvailable;
-
-        //Copy data from the buffer to the user buffer
-        memcpy(buffer + bytesCopied, fcb->buffer + fcb->bufferPos, bytesToCopy);
-
-        //Update positions and counters
-        fcb->bufferPos += bytesToCopy;
-        fcb->filePos += bytesToCopy;
+		//Update values
+		fcb->bufferPos += bytesToCopy;
         bytesCopied += bytesToCopy;
+        count -= bytesToCopy;
     }
 
+    //Handle large read directly to user's buffer
+    if (count >= B_CHUNK_SIZE) {
+        //Read large chunk of blocks at once directly to USER's buffer
+        int blocksToRead = count / B_CHUNK_SIZE;
+
+        fcb->blockOffset += LBAread(buffer + bytesCopied, blocksToRead, fcb->fi->location + fcb->blockOffset);
+
+		//Update values
+        int bytesRead = blocksToRead * B_CHUNK_SIZE;
+        bytesCopied += bytesRead;
+        count -= bytesRead;
+    }
+
+    //Handle the remaining data
+    if (count > 0) {
+        fcb->blockOffset += LBAread(fcb->buffer, 1, fcb->fi->location + fcb->blockOffset);
+
+		memcpy(buffer + bytesCopied, fcb->buffer, count);
+
+		//Update values
+		fcb->bufferPos = count;
+		bytesCopied += count;
+    }
+
+	fcb->filePos += bytesCopied;
     return bytesCopied;
 }
 	
@@ -188,6 +206,7 @@ int b_close (b_io_fd fd) {
 
     fcbArray[fd].bufferPos = 0;
     fcbArray[fd].filePos = 0;
+	fcbArray[fd].blockOffset = 0;
 
 	return 0;
 }
