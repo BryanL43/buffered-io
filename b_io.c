@@ -34,7 +34,7 @@ typedef struct b_fcb {
 	// Add any other needed variables here to track the individual open file
 	char* buffer;		//Buffer for holding excess data
 	int bufferPos;		//Tracks current buffer index
-    int filePos;		//Tracks the amount of bytes read from file
+	int filePos;		//Tracks the amount of bytes read from file
 	int blockOffset;	//Block offset from the file location
 } b_fcb;
 	
@@ -80,8 +80,8 @@ b_io_fd b_open (char * filename, int flags) {
 	if (startup == 0) b_init();  //Initialize our system
 
 	//*** TODO ***//  Write open function to return your file descriptor
-	//				  You may want to allocate the buffer here as well
-	//				  But make sure every file has its own buffer
+	//You may want to allocate the buffer here as well
+	//But make sure every file has its own buffer
 
 	// This is where you are going to want to call GetFileInfo and b_getFCB
 	fileInfo* fileInfo = GetFileInfo(filename);
@@ -110,8 +110,6 @@ b_io_fd b_open (char * filename, int flags) {
 
 	return fd;
 }
-
-int abcde = 0;
 
 // b_read functions just like its Linux counterpart read.  The user passes in
 // the file descriptor (index into fcbArray), a buffer where thay want you to 
@@ -145,47 +143,47 @@ int b_read (b_io_fd fd, char * buffer, int count) {
 	}
 
 	b_fcb* fcb = &fcbArray[fd];
-    int bytesCopied = 0;
+	int bytesCopied = 0;
 
-    //EOF cap: limit count to not exceed the file size
-    if (fcb->filePos + count > fcb->fi->fileSize) {
-        count = fcb->fi->fileSize - fcb->filePos;
-    }
+	//EOF cap: limit count to not exceed the file size
+	if (fcb->filePos + count > fcb->fi->fileSize) {
+		count = fcb->fi->fileSize - fcb->filePos;
+	}
 
-    //Check if there is remaining data in the file control block's
+	//Check if there is remaining data in the file control block's
 	//buffer to transfer to the caller's buffer
-    if (fcb->bufferPos > 0) {
-        //Copy the existing data from our buffer to the caller's buffer
-        int bytesAvailable = B_CHUNK_SIZE - fcb->bufferPos;
-        int bytesToCopy = (count < bytesAvailable) ? count : bytesAvailable;
-        memcpy(buffer, fcb->buffer + fcb->bufferPos, bytesToCopy);
+	if (fcb->bufferPos > 0) {
+		//Copy the existing data from our buffer to the caller's buffer
+		int bytesAvailable = B_CHUNK_SIZE - fcb->bufferPos;
+		int bytesToCopy = (count < bytesAvailable) ? count : bytesAvailable;
+		memcpy(buffer, fcb->buffer + fcb->bufferPos, bytesToCopy);
 
 		//Update variables according to the number of bytes copied
 		fcb->bufferPos += bytesToCopy;
-        bytesCopied += bytesToCopy;
-        count -= bytesToCopy;
-    }
+		bytesCopied += bytesToCopy;
+		count -= bytesToCopy;
+	}
 
-    //Check if the requested bytes is large enough to
+	//Check if the requested bytes is large enough to
 	//read directly into the caller's buffer
-    if (count >= B_CHUNK_SIZE) {
-        //Read chunk of blocks at once directly to caller's buffer
-        int blocksToRead = count / B_CHUNK_SIZE;
+	if (count >= B_CHUNK_SIZE) {
+		//Read chunk of blocks at once directly to caller's buffer
+		int blocksToRead = count / B_CHUNK_SIZE;
 
-        fcb->blockOffset += 
+		fcb->blockOffset += 
 			LBAread(buffer + bytesCopied, blocksToRead, fcb->fi->location + fcb->blockOffset);
 
 		//Update variables according to the number of bytes copied
-        int bytesRead = blocksToRead * B_CHUNK_SIZE;
-        bytesCopied += bytesRead;
-        count -= bytesRead;
-    }
+		int bytesRead = blocksToRead * B_CHUNK_SIZE;
+		bytesCopied += bytesRead;
+		count -= bytesRead;
+	}
 
-    //Check if the caller's requested bytes is fullfilled
+	//Check if the caller's requested bytes is fullfilled
 	//after transferring available data and handling large reads
-    if (count > 0) {
+	if (count > 0) {
 		//Read a single block of data to our file control block's buffer
-        fcb->blockOffset += LBAread(fcb->buffer, 1, fcb->fi->location + fcb->blockOffset);
+		fcb->blockOffset += LBAread(fcb->buffer, 1, fcb->fi->location + fcb->blockOffset);
 
 		//Transfer the necessary data to fullfill caller's requested bytes
 		memcpy(buffer + bytesCopied, fcb->buffer, count);
@@ -193,10 +191,10 @@ int b_read (b_io_fd fd, char * buffer, int count) {
 		//Update variables according to the number of bytes copied
 		fcb->bufferPos = count;
 		bytesCopied += count;
-    }
+	}
 
 	fcb->filePos += bytesCopied;
-    return bytesCopied;
+	return bytesCopied;
 }
 	
 
@@ -207,17 +205,17 @@ int b_close (b_io_fd fd) {
 	//*** TODO ***//  Release any resources
 
 	if (fd < 0 || fd >= MAXFCBS || fcbArray[fd].fi == NULL) {
-        return -1;
-    }
+		return -1;
+	}
 
 	//Release resources
-    fcbArray[fd].fi = NULL;
+	fcbArray[fd].fi = NULL;
 
-    free(fcbArray[fd].buffer);
-    fcbArray[fd].buffer = NULL;
+	free(fcbArray[fd].buffer);
+	fcbArray[fd].buffer = NULL;
 
-    fcbArray[fd].bufferPos = 0;
-    fcbArray[fd].filePos = 0;
+	fcbArray[fd].bufferPos = 0;
+	fcbArray[fd].filePos = 0;
 	fcbArray[fd].blockOffset = 0;
 
 	return 0;
