@@ -98,7 +98,6 @@ b_io_fd b_open (char * filename, int flags) {
 	fcbArray[fd].buffer = malloc(B_CHUNK_SIZE);
 	if (fcbArray[fd].buffer == NULL) {
 		fcbArray[fd].fi = NULL;
-		perror("Failed to allocate buffer!");
 		return -1;
 	}
 
