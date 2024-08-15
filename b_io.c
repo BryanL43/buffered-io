@@ -168,12 +168,13 @@ int b_read (b_io_fd fd, char * buffer, int count) {
 	if (count >= B_CHUNK_SIZE) {
 		//Read chunk of blocks at once directly to caller's buffer
 		int blocksToRead = count / B_CHUNK_SIZE;
-
-		fcb->blockOffset += 
+		int blocksRead = 
 			LBAread(buffer + bytesCopied, blocksToRead, fcb->fi->location + fcb->blockOffset);
+			
+		fcb->blockOffset += blocksRead;
 
 		//Update variables according to the number of bytes copied
-		int bytesRead = blocksToRead * B_CHUNK_SIZE;
+		int bytesRead = blocksRead * B_CHUNK_SIZE;
 		bytesCopied += bytesRead;
 		count -= bytesRead;
 	}
