@@ -2,6 +2,9 @@
 
 **Assignment 5 – Buffered I/O**
 
+**`Score: 94/100`**</br>
+Note: Code errors are resolved; comments are not.
+
 Welcome to your next homework assignment.  
 
 **NOTE:** The GitHub due date is the CUTOFF time and **not** the actual due date. See Canvas for the actual due date.
